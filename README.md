@@ -188,6 +188,8 @@ python train.py \
 4. 再逐级验证 VQ-VAE → GPT → Global/Local diffusion。
 5. 补齐可下载 checkpoint、推理样例和结果视频。
 
+模型权重、Normalizer、SMPL 资产以及下载优先级见 [WEIGHTS.md](WEIGHTS.md)。
+
 ## License
 
 本仓库采用 [MIT License](LICENSE)。仓库内引入的第三方代码和数据集仍受各自许可证约束。
