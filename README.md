@@ -39,11 +39,11 @@ git pull --ff-only origin main
 
 ## 3. 方法与代码结构
 
-当前代码大致由三个生成阶段和一组数据/评测工具组成：
+当前 LODGEPP 主推理链由三个生成阶段和一组数据/评测工具组成：
 
 1. **VQ-VAE 动作表征**：学习离散动作 token。
 2. **GPT/key-motion 建模**：生成或组织长序列中的关键动作 token。
-3. **DanceDiffusion 局部细化**：结合音乐条件细化连续舞蹈动作。
+3. **DanceDiffusion 局部细化**：结合音乐、检索到的 key-motion 和粗动作细化连续舞蹈动作。
 
 主要目录：
 
@@ -120,7 +120,7 @@ sha256: d6ea20546150d76c240215fe6bc9c2aeddc5434e20cf805f3240565570d03a36
 1. 将数据、SMPL/SMPL-H/SMPL-X 和 normalizer 路径改到当前 EFS。
 2. 确认目标动作表示是 139、263、266 还是其他维度。
 3. 生成对应的 motion/music features、key-motion 和 Mean/Std。
-4. 补齐 VQ-VAE、GPT、Global/Local diffusion checkpoint。
+4. 补齐 LODGEPP 主线的 VQ-VAE、GPT 和 Local Diffusion checkpoint。
 5. 固定 Python、PyTorch、PyTorch3D、PyTorch Lightning 等依赖版本。
 
 ## 6. 训练链路草案
@@ -155,13 +155,14 @@ python train.py \
   --device 0
 ```
 
-推理入口主要包括：
+LODGEPP 主推理入口：
 
-- `DanceDiffusion/infer_lodge.py`
-- `infer/infer_diff_ar_smpl.py`
 - `infer/infer_gpt_diff_key.py`
 
-这些入口当前仍依赖旧路径和未发布 checkpoint，运行前必须完成配置迁移。
+它严格加载 FineDance 139D VQ-VAE、GPT 和 Local Diffusion 三个 checkpoint，并依赖匹配的
+三份实验 YAML、Normalizer、key-motion 库和 35D 音乐特征。`DanceDiffusion/infer_lodge.py`
+属于公开 Lodge 的旧 Global → Local 基线路线，不是当前 LODGEPP 主入口。详细文件身份见
+[WEIGHTS.md](WEIGHTS.md)。
 
 ## 7. 当前验收状态
 
@@ -185,7 +186,7 @@ python train.py \
 1. 新建一份只针对当前 EFS 的资产配置，不修改和删除历史配置。
 2. 固定 Python/CUDA/PyTorch 依赖并建立独立环境。
 3. 先跑数据读取和单 batch 前向 smoke test。
-4. 再逐级验证 VQ-VAE → GPT → Global/Local diffusion。
+4. 再逐级验证 VQ-VAE → GPT → key-motion retrieval → Local Diffusion。
 5. 补齐可下载 checkpoint、推理样例和结果视频。
 
 模型权重、Normalizer、SMPL 资产以及下载优先级见 [WEIGHTS.md](WEIGHTS.md)。

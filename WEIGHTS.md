@@ -1,7 +1,24 @@
-# LODGEPP 权重与运行资产清单
+# LODGEPP 推理权重与资产清单
 
-本文档根据当前仓库的实际加载代码整理。模型文件尚未放入 Git，服务器部署目录中也尚未发现任何
-`.ckpt`、`.pth` 或 `.pt` 权重。
+本文只针对当前仓库最后持续更新的 LODGEPP 推理入口：
+
+```text
+infer/infer_gpt_diff_key.py
+```
+
+该入口在源仓库 2024-07-10 加入，并持续更新至 2024-08-28。它不是公开版 Lodge
+`DanceDiffusion/infer_lodge.py` 的 Global → Local 两阶段入口，而是：
+
+```text
+音乐 35D 特征
+  → GPT 生成 VQ token
+  → VQ-VAE 解码粗动作
+  → FineDance key-motion 检索/替换
+  → Local Diffusion 细化
+  → 139D SMPL body motion
+```
+
+当前代码没有 LoRA、PEFT 或 adapter 权重加载逻辑。下面三项都是完整模型 checkpoint。
 
 服务器代码目录：
 
@@ -9,173 +26,205 @@
 /efs/nicorhli/project/LODGEPP
 ```
 
-## 1. 第一优先级：标准 Lodge Global + Local 推理
+## 1. 必须取得的三个 LODGEPP checkpoint
 
-标准 Lodge 是两阶段推理：Global Diffusion 先生成 characteristic dance primitives，Local
-Diffusion 再生成完整动作。当前 `DanceDiffusion/infer_lodge.py` 会以 `strict=True` 分别加载
-两个 Lightning checkpoint，因此两个文件缺一不可，而且必须与各自的训练配置匹配。
+### 1.1 FineDance 139D VQ-VAE
 
-当前增强代码中写死的文件是：
-
-| 阶段 | 当前代码要求的 checkpoint | 用途 |
-| --- | --- | --- |
-| Global | `FineDance_Coarse_Norm_139_WIN10/checkpoints/epoch=2999.ckpt` | 1024 帧全局动作/关键动作生成 |
-| Local | `AFineDance_FineTuneV2_originweight_relative_Norm_GenreDis_bc190_nofc/checkpoints/epoch=299.ckpt` | 256 帧局部细化和连接 |
-
-如果保持当前脚本不改，建议最终放到：
+历史 139D 推理运行记录中的候选文件：
 
 ```text
-/efs/nicorhli/project/LODGEPP/DanceDiffusion/experiments/Global_Module/FineDance_Coarse_Norm_139_WIN10/checkpoints/epoch=2999.ckpt
-/efs/nicorhli/project/LODGEPP/DanceDiffusion/experiments/Local_Module/AFineDance_FineTuneV2_originweight_relative_Norm_GenreDis_bc190_nofc/checkpoints/epoch=299.ckpt
+FineDance_1007_1024_win128/vqvae/f_139/best_recon.pth
 ```
 
-同时还需要 Global checkpoint 对应的完整训练配置：
+旧 `Adebug/parameters.yaml` 留下的完整候选路径：
 
 ```text
-FineDance_Coarse_Norm_139_WIN10/config_2024-03-06-01-15-26_train.yaml
+/data2/lrh/project/dance/long/experiments/vqvae/output_vq/clip8_139/FineDance_1007_1024_win128/vqvae/f_139/best_recon.pth
 ```
 
-> 注意：上述 `AFineDance_..._nofc` 是当前私有增强代码选择的实验版本。目前没有在公开仓库中找到
-> 这个精确 checkpoint 的公开下载地址，需要从原训练机、旧实验盘或作者备份中取回。
+加载契约：
 
-## 2. 官方可下载的 Lodge 权重包
+```python
+ckpt = torch.load(path, map_location="cpu")
+net.load_state_dict(ckpt["net"], strict=True)
+```
 
-官方公开的 Lodge 仓库提供了一个预训练包：
+因此最终文件顶层必须包含 `net`。但 LODGEPP 实际使用的 `resume_pth` 保存在当前缺失的
+`old-vqvae139.yaml` 中；取回该 YAML 前，不能把上述历史候选路径当作最终确认值。
 
-- 文件名：`exp.tar.gz`
-- 已核验大小：`2,487,809,471` bytes，约 2.32 GiB
-- [Google Drive 下载](https://drive.google.com/file/d/13Yp__EPAw0EjrSS898X5FtSQGmveBykA/view?usp=sharing)
-- [百度网盘下载](https://pan.baidu.com/s/1twYAdqR5OjSPkIlT1AJafw?pwd=1mte)，提取码 `1mte`
+### 1.2 FineDance 139D GPT
 
-官方推理脚本期待压缩包解压后至少提供：
+历史 139D 推理运行记录中的候选文件：
 
 ```text
-exp/Global_Module/FineDance_Global/checkpoints/epoch=2999.ckpt
-exp/Global_Module/FineDance_Global/global_train.yaml
-exp/Local_Module/FineDance_FineTuneV2_Local/checkpoints/epoch=299.ckpt
-exp/Local_Module/FineDance_FineTuneV2_Local/local_train.yaml
+FineDance_1007_1024_win128/ckpt/mask_best_acc.pth
 ```
 
-这套权重是当前最值得先下载的完整基线。它对应公开版 Lodge 的 139D FineDance Global + Local
-模型，但文件名和实验配置与当前 `Lodge_plus_smpl` 增强分支不完全相同。在没有检查
-`state_dict` 键和张量形状前，不能声称它能直接替代上一节的私有增强 checkpoint。
-
-建议下载后保留原始压缩包，并解压到：
+旧 `Adebug/parameters.yaml` 留下的完整候选路径：
 
 ```text
-/efs/nicorhli/project/LODGEPP/pretrained/lodge_official/exp.tar.gz
-/efs/nicorhli/project/LODGEPP/pretrained/lodge_official/exp/
+/data2/lrh/project/dance/long/experiments/vqvae/gpt/clip8_139/FineDance_1007_1024_win128/ckpt/mask_best_acc.pth
 ```
 
-## 3. 必需的非模型权重资产
+加载契约：
+
+```python
+ckpt = torch.load(path, map_location="cpu")
+trans_encoder.load_state_dict(ckpt["trans"], strict=True)
+```
+
+因此最终文件顶层必须包含 `trans`。但 LODGEPP 实际使用的 `resume_trans` 保存在当前缺失的
+`pld-gpt139.yaml` 中；取回该 YAML 前，不能把上述历史候选路径当作最终确认值。
+
+### 1.3 LODGEPP Local Diffusion
+
+精确实验和 checkpoint：
+
+```text
+DanceDiffusion/experimentsFD139/FineDance0704/Local_Module/
+replace32128_win2_len128_relativeloss_Norm/checkpoints/epoch=2899.ckpt
+```
+
+加载契约：
+
+```python
+state_dict = torch.load(path, map_location="cpu")["state_dict"]
+model_fine.load_state_dict(state_dict, strict=True)
+```
+
+因此文件顶层必须包含 `state_dict`，并且必须与下面的 `cfgdiff` 完全匹配。
+
+## 2. 三个 checkpoint 对应的配置文件
+
+权重本身不够。推理脚本先从三个 YAML 构建网络，再以 `strict=True` 加载权重：
+
+```text
+DanceDiffusion/experimentsFD139/vqgpt/old-vqvae139.yaml
+DanceDiffusion/experimentsFD139/vqgpt/pld-gpt139.yaml
+DanceDiffusion/experimentsFD139/FineDance0704/Local_Module/
+replace32128_win2_len128_relativeloss_Norm/config_2024-07-06-11-00-05_train.yaml
+```
+
+当前 Git 仓库中这三个实验 YAML 也不存在，必须和 checkpoint 一起找回。不能只用
+`configs/vqvae/finedance139.yaml` 或 `configs/gpt/finedance139.yaml` 猜测替代，因为网络宽度、
+codebook、序列长度或 normalization 设置只要有一项不同，严格加载就会失败。
+
+## 3. 必须取得的非模型资产
 
 ### 3.1 FineDance 139D Normalizer
 
-139D Global/Local 模型都会加载与训练时一致的 normalizer：
+当前资产配置引用：
 
 ```text
-Normalizer.pth
+/data2/lrh/project/dance/Lodge/lodge302/data/Normalizer.pth
 ```
 
-公开版文件只有约 4.5 KB，可从官方仓库取得：
+推理时用于 VQ 输出反归一化、key-motion 归一化以及相邻 Local Diffusion 窗口衔接。必须使用
+原训练时同一份文件，不能用当前 315D SMPL-X 原始动作临时生成的统计量替代。
 
-- [Normalizer.pth](https://github.com/li-ronghui/LODGE/raw/refs/heads/main/data/Normalizer.pth)
+### 3.2 FineDance 139D key-motion 库
 
-建议保存为：
+当前资产配置引用：
 
 ```text
-/efs/nicorhli/project/LODGEPP/pretrained/lodge_official/data/Normalizer.pth
+/data2/lrh/dataset/fine_dance/gound/mofea319/keymo
 ```
 
-不能用当前 315D 原始 SMPL-X motion 临时计算出的统计量替代它；动作表示、维度与预处理必须与
-checkpoint 完全一致。
+推理启动时会遍历其中所有 `.npy`，必要时从 319D 截取前 139D，然后建立检索库。这不是模型
+权重，但缺少它时 LODGEPP 主入口无法启动。
 
-### 3.2 SMPL-X 静态骨架
-
-`smplx_neu_J_1.npy` 是前向运动学使用的静态关节模板，不是训练权重。它已经随当前仓库提供：
+### 3.3 FineDance 35D 音乐特征和标签
 
 ```text
-DanceDiffusion/data/smplx_neu_J_1.npy
-smplx_neu_J_1.npy
+/data2/lrh/dataset/fine_dance/gound/musicfea_edge
+/data2/lrh/dataset/fine_dance/origin/label_json
 ```
 
-无需重复下载，但当前代码仍有旧机器绝对路径，需要部署时改为仓库内路径。
+输入也可以从音频现场提取 35D 特征，但当前默认资产路径仍需要迁移。服务器现有 FineDance
+归档主要是原始/整理后数据，尚未证明包含与该推理代码完全一致的 `mofea319/keymo` 和
+`musicfea_edge`。
 
-## 4. 第二优先级：VQ-VAE + GPT + Local Diffusion 实验路线
+## 4. 建议的服务器落盘位置
 
-只有在准备运行 `infer/infer_gpt_diff_key.py` 时，才需要下面三个额外模型：
-
-| 模型 | 代码中出现的文件 | checkpoint 字典键 |
-| --- | --- | --- |
-| FineDance 139D VQ-VAE | `best_recon.pth` | `net` |
-| FineDance 139D GPT | `mask_best_acc.pth` | `trans` |
-| 128 帧 Local Diffusion | `replace32128_win2_len128_relativeloss_Norm/checkpoints/epoch=2899.ckpt` | `state_dict` |
-
-历史代码给出的 VQ-VAE/GPT 实验身份为：
+收到文件后，建议保留实验身份，不要把不同 checkpoint 混放：
 
 ```text
-VQ-VAE: FineDance_1007_1024_win128/vqvae/f_139/best_recon.pth
-GPT:    FineDance_1007_1024_win128/ckpt/mask_best_acc.pth
+/efs/nicorhli/project/LODGEPP/pretrained/lodgepp/vqvae/
+  best_recon.pth
+  old-vqvae139.yaml
+
+/efs/nicorhli/project/LODGEPP/pretrained/lodgepp/gpt/
+  mask_best_acc.pth
+  pld-gpt139.yaml
+
+/efs/nicorhli/project/LODGEPP/pretrained/lodgepp/local_diffusion/
+  epoch=2899.ckpt
+  config_2024-07-06-11-00-05_train.yaml
+
+/efs/nicorhli/project/LODGEPP/pretrained/lodgepp/data/
+  Normalizer.pth
+  keymo/
 ```
 
-该路线还依赖以下匹配配置和中间资产：
+随后新增一份 EFS 专用资产配置，把旧 `/data2/lrh/...` 路径映射到上述目录，不覆盖历史配置。
+
+## 5. 目前不要下载或混用的权重
+
+- 公开 Lodge 的 `exp.tar.gz`：是公开版 Global → Local 基线，不是当前 LODGEPP 主入口需要的
+  VQ-VAE + GPT + Local Diffusion 三权重组合。
+- `FineDance_Global/checkpoints/epoch=2999.ckpt`：公开 Lodge Global Diffusion，LODGEPP 主入口
+  没有加载它。
+- `FineDance_FineTuneV2_Local/checkpoints/epoch=299.ckpt`：公开 Lodge Local checkpoint，不是
+  当前代码指定的 `replace32128.../epoch=2899.ckpt`。
+- `experiments/1023edge139_256_35/.../Full-train-3070.pt`：2024-07-10 提交中的旧 DEBUG/EDGE
+  路线运行记录；最新版 LODGEPP 主入口改用 Lightning `epoch=2899.ckpt`。
+- 263D、266D、290D checkpoint：动作表示不一致，不能与当前 139D 主线混用。
+- SMPL、SMPL-H、SMPL-X 参数模型：仅在需要网格渲染时另行准备，不属于这三个生成模型权重。
+
+## 6. 当前来源状态
+
+截至 2026-10-08：
+
+- 当前本地代码、GitHub 仓库和服务器代码目录中均没有上述三个 checkpoint。
+- 当前 Git 仓库也没有三份匹配实验 YAML。
+- 没有在代码中发现这组三权重的公开下载链接。
+- 原始旧路径均位于 `/data2/lrh/...`，最可靠的来源是原训练机备份或原工程归档。
+- AWS EFS 上正在下载的 `/efs/nicorhli/lrh-20260828/project.zip.part-00` 很可能包含原工程和
+  checkpoint，但下载尚未完成，当前不能将它作为已取得权重。
+
+## 7. 请按这个清单查找或下载
 
 ```text
-old-vqvae139.yaml
-pld-gpt139.yaml
-config_2024-07-06-11-00-05_train.yaml
-FineDance 139D key-motion 库
-FineDance 139D tokenized motion
-Normalizer.pth
+[必须] best_recon.pth
+实验身份：FineDance_1007_1024_win128/vqvae/f_139
+
+[必须] mask_best_acc.pth
+实验身份：FineDance_1007_1024_win128/ckpt
+
+[必须] epoch=2899.ckpt
+实验身份：replace32128_win2_len128_relativeloss_Norm
+
+[必须] old-vqvae139.yaml
+[必须] pld-gpt139.yaml
+[必须] config_2024-07-06-11-00-05_train.yaml
+[必须] Normalizer.pth
+[必须] mofea319/keymo 目录
 ```
 
-当前仓库只保留了加载路径，没有找到这三个模型的公开下载地址。它们不是运行官方
-`infer_lodge.py` 基线的必需项，建议第二批再找。
-
-## 5. 仅渲染网格时需要的 SMPL 系列模型
-
-当前根目录 `render.py` 会初始化 SMPL、SMPL-H 和 SMPL-X。若使用它渲染人体网格，需要从
-[SMPL-X 官方网站](https://smpl-x.is.tue.mpg.de/) 按其许可证下载：
+如果能从旧机器或工程归档按目录取回，优先打包以下路径，而不是只凭同名文件挑选：
 
 ```text
-smpl/SMPL_MALE.pkl
-smplh/SMPLH_MALE.pkl
-smplx/SMPLX_NEUTRAL.npz
+/data2/lrh/project/dance/LodgePlus/Lodge_plus_smpl/DanceDiffusion/experimentsFD139/vqgpt/
+
+/data2/lrh/project/dance/LodgePlus/Lodge_plus_smpl/DanceDiffusion/experimentsFD139/
+FineDance0704/Local_Module/replace32128_win2_len128_relativeloss_Norm/
+
+/data2/lrh/project/dance/long/experiments/vqvae/output_vq/clip8_139/
+FineDance_1007_1024_win128/
+
+/data2/lrh/project/dance/long/experiments/vqvae/gpt/clip8_139/
+FineDance_1007_1024_win128/
 ```
 
-这些是受许可证约束的人体参数模型，不应提交到公开 GitHub。只生成/评估 139D 骨架动作时，
-不必先下载全部三个文件。
-
-## 6. 当前不需要下载的权重
-
-- `hrnet_w32-36af842e.pth`：用于 AIST++ 视频姿态/分割预处理，不属于 FineDance Lodge 推理。
-- Jukebox `vqvae.pth.tar`、`prior_level_2.pth.tar`：属于可选 Jukemirlib 音乐特征流程，主线
-  35D FineDance 特征提取不需要。
-- EDGE 目录中的 `Full-train-*.pt` / `train-*.pt`：旧基线和调试脚本引用，标准 Lodge
-  Global + Local 推理不需要。
-- 266D/263D/290D checkpoint：属于其他动作表示，不能与当前 139D 主线混用。
-
-## 7. 推荐下载顺序
-
-1. 下载官方 `exp.tar.gz`，不要改名。
-2. 下载官方 `Normalizer.pth`。
-3. 将两者上传到服务器 `pretrained/lodge_official/`，保留源文件校验值。
-4. 解压后核对四个官方模型/配置文件是否齐全，再检查 `state_dict` 与当前代码兼容性。
-5. 若目标是完整复现私有增强版，再寻找当前脚本精确指定的两个 checkpoint。
-6. 只有要跑 GPT/key-motion 实验时，再寻找 VQ-VAE、GPT 和 `epoch=2899.ckpt`。
-
-## 8. 下载后需要记录的信息
-
-每个文件至少记录：
-
-```text
-原始下载链接
-原始文件名
-文件大小
-SHA-256
-解压目录
-对应代码 commit
-对应配置文件
-```
-
-只有文件存在还不代表可用；最终还要通过 checkpoint 结构检查、严格加载和单样本 GPU 推理。
+取得后必须记录文件大小和 SHA-256，并依次检查：顶层字典键 → `strict=True` 加载 → 单音乐片段
+GPU 推理 → 输出 139D motion 的形状和有限值。
