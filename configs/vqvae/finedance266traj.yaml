@@ -1,0 +1,57 @@
+dataname:
+- FINEDANCE_266CUT_TRAJ4
+Norm: True
+DATA_SETTING:
+  mix: False           # 是否做混合的数据增强
+  full_seq_len: 128   # 150
+  windows: 3  # 16   #40   #
+  is_mirror: False    # 是否做镜像的数据增强
+  nfeats: 28
+  # njoints: 22   
+  mode: single  # "single" , "double_react", "double"
+  partial: full   # "full" , "morden", "tradition"
+  GENRE_NUM: 16
+# normdir: /data2/lrh/dataset/fine_dance/gound/smplx_mofea266/noMirror_Norm/
+gpu: 2
+batch_size: 1024
+total_iter: 18000
+warm_up_iter: 1000
+lr: 0.0001
+lr_scheduler:
+- 8000
+- 14000
+gamma: 0.05
+weight_decay: 0.0
+commit: 0.02
+loss_vel: 0.2
+recons_loss: l1
+code_dim: 1024
+nb_code: 1024
+mu: 0.99
+down_t: 2
+stride_t: 2
+width: 1024
+depth: 3
+dilation_growth_rate: 3
+output_emb_width: 1024
+vq_act: relu
+vq_norm: null
+quantizer: ema_reset
+beta: 1.0
+resume_pth: null
+resume_gpt: null
+out_dir: experimentsFD/vqvae/
+# ckpt_dir: experiments/vqvae/ckpt
+results_dir: visual_results/
+visual_name: baseline
+exp_name: FINEDANCE_266CUT_traj7/0625_win128_Norm_bc1024
+print_iter: 10
+save_iter: 500
+eval_iter: 500
+seed: 123
+vis_gt: false
+nb_vis: 20
+keymotion_dir: null
+
+
+

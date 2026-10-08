@@ -1,0 +1,29 @@
+decoder:
+  type: MotionDecoderMix4
+  loss_type: l2
+  MotionDecoderMix4:
+    nfeats: 139
+    dim:
+      - 1024
+      - 768
+      - 512
+      - 319
+    scale: 4
+
+nfeats: ${decoder.MotionDecoderMix4.nfeats}
+outfeats: 319
+wandb_pj_name: multidecoder
+keymotion_dir: /data2/lrh/dyq/debug_exp/output_gpt/0819/FineDance_decoder_frame_512_iter200000_tk/keymotion
+
+
+optimizer_config:
+  lr: 0.001
+  lr_scheduler:
+  - 5000
+  - 20000
+  gamma: 0.1
+  weight_decay: 1.0e-06
+  decay_option: all
+  optimizer: adamw
+
+resume_decoder: /data2/lrh/dyq/debug_exp/output_gpt/0820/FineDance_decoder_frame_512_iter200000_tk/decoder_ckpt/930.pth

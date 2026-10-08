@@ -1,0 +1,1 @@
+infer/infer_gpt_diffu_whole_ar_key.py --cond_feadim 35 --nfeats 139 --keymotion_dir  --motion_save_dir Adebug --save_motions

@@ -1,0 +1,196 @@
+# NAME: 0524_Norm_loss266origin_diff_bc768 # Experiment name
+project: experiments/EDGE_finedance266
+exp_name: len128_win2_266loss_vec_vel
+log_interval: 10
+save_interval: 50
+wandb_pj_name: EDGE_finedance266_norm
+ema_interval: 1
+savedir: None
+feature_type: baseline
+render: True
+ACCELERATOR: 'gpu' # Devices optioncal: “cpu”, “gpu”, “tpu”, “ipu”, “hpu”, “mps, “auto”
+DEVICE: [0]   #,  #  # Index of gpus eg. [0] or [0,1,2,3]
+
+# FOLDER: ./experiments
+SEED_VALUE: 1234
+Norm: True
+DEBUG: False
+Discriminator: False
+Replace: False
+TRAIN:
+  STAGE: diffusion    # diffusion
+  SPLIT: 'train'
+  NUM_WORKERS: 16 # Number of workers
+  BATCH_SIZE: 768 # Size of batches
+  START_EPOCH: 1 # Start epoch
+  END_EPOCH: 2001 # End epoch
+  RESUME: '' # Experiment path to be resumed training
+  PRETRAINED_VAE: ''
+  PRETRAINED: '' # Pretrained model path
+  DATASETS: ['FINEDANCE_266CUT'] # Training datasets
+
+  # OPTIM:
+  #   TYPE: 'AdamW' # Optimizer type
+  #   LR: 1e-4 # Learning rate
+  OPTIM:
+    TYPE: 'Adan' # Optimizer type
+    LR: 4e-4 # Learning rate
+
+  ABLATION:
+    VAE_TYPE: 'no' # vae ablation: actor or mcross
+    VAE_ARCH: 'encoder_decoder' # mdiffusion vae architecture
+    PE_TYPE: 'actor' # mdiffusion mld or actor
+    DIFF_PE_TYPE: 'actor' # mdiffusion mld or actor
+    SKIP_CONNECT: False # skip connection for denoiser va
+    # use linear to expand mean and std rather expand token nums
+    MLP_DIST: False
+    IS_DIST: False # Mcross distribution kl
+    PREDICT_EPSILON: False # noise or motion
+
+EVAL:
+  SPLIT: 'gtest'
+  BATCH_SIZE: 256 # Evaluating Batch size
+  NUM_WORKERS: 16 # Evaluating Batch size
+
+TEST:
+  TEST_DIR: ''
+  CHECKPOINTS: '' #/data2/lrh/project/dance/Lodge/lodge_pylight/experiments/Edge_Module/0115_newNorm_256len_263_diff_bc768/checkpoints/epoch=3899.ckpt 
+  SPLIT: 'gtest'
+  BATCH_SIZE: 256 # Testing Batch size
+  NUM_WORKERS: 12 # Evaluating Batch size
+  SAVE_PREDICTIONS: True # Weather to save predictions
+  COUNT_TIME: False # Weather to count time during test
+  REPLICATION_TIMES: 2 # Number of times to replicate the test
+  MM_NUM_SAMPLES: 100 # Number of samples for multimodal test
+  MM_NUM_REPEATS: 30 # Number of repeats for multimodal test
+  MM_NUM_TIMES: 10 # Number of times to repeat the multimodal test
+  DIVERSITY_TIMES: 300 # Number of times to repeat the diversity test
+  REP_I: 0
+  DATASETS: ['FINEDANCE_266CUT']
+
+model:
+  target: 'modules'
+  vae_type: 'no'
+  
+  vae: true # whether vae model
+  model_type: Local_Module # model type
+  condition: 'music'
+  latent_dim: [1, 256]  #[512, 135]    # [${DATA_SETTING.full_seq_len}, ${DATASET.NFEATS}]      #  # latent dimension
+  ff_size: 1024 #
+  num_layers: 9 # number of layers
+  num_head: 4 # number of head layers
+  droupout: 0.1 # dropout rate
+  activation: gelu # activation type
+  guidance_scale: 7.5   # 7.5 #
+  guidance_uncondp: 0.1 # 0.1 0.25
+
+  denoiser:
+    target: dld.models.architectures.dld_denoiser.DldDenoiser
+    params:
+      music_encoded_dim: ${model.DanceDecoder.cond_feature_dim}
+      ff_size: 1024
+      num_layers: 9
+      num_heads: 4
+      dropout: 0.1
+      normalize_before: False
+      activation: 'gelu'
+      flip_sin_to_cos: True
+      return_intermediate_dec: False
+      position_embedding: 'learned'
+      arch: trans_enc
+      freq_shift: 0
+      condition: ${model.condition}
+      latent_dim: ${model.latent_dim}
+      guidance_scale: ${model.guidance_scale}
+      guidance_uncondp: ${model.guidance_uncondp}
+      nfeats: ${DATASET.NFEATS}
+      ablation: ${TRAIN.ABLATION}
+
+  diffusion:   
+    target: model.diffusion.GaussianDiffusion
+    params:
+      horizon: ${DATA_SETTING.full_seq_len}
+      repr_dim: ${DATA_SETTING.nfeats}
+      schedule: "cosine"
+      n_timestep: 1000
+      predict_epsilon: False
+      loss_type: "l2"
+      use_p2: False
+      cond_drop_prob: 0.25
+      guidance_weight: 2
+ 
+  DanceDecoder:   
+    target: model.model.DanceDecoder
+    params:
+      nfeats: ${DATA_SETTING.nfeats}
+      seq_len: ${DATA_SETTING.full_seq_len}
+      latent_dim: 512
+      ff_size: 1024
+      num_layers: 8
+      num_heads: 8
+      dropout: 0.1
+      cond_feature_dim: 35
+      activation: gelu
+
+   
+
+LOSS:
+  TYPE: loss_vec_vel # Losses type  loss_266  loss_266_origin   loss_with_wave
+  LAMBDA_LOSS: 1.0 # 1.0  Lambda for reconstruction losses
+  LAMBDA_LOCAL: 0.5 # 0.5
+  LAMBDA_BONE: 10.0
+  LAMBDA_V: 0.0
+  LAMBDA_A: 0.0     # 0.2
+  # LAMBDA_FC: 30.0   # 20.0
+  LAMBDA_WAVE_LL: 0.0   # 0.0
+  LAMBDA_WAVE_LH: 0.0   # 0.5
+  LAMBDA_WAVE_HL: 0.0  # 0.5
+  LAMBDA_WAVE_HH: 0.0 # 0.5
+  DIST_SYNC_ON_STEP: True # Sync Losses on step when distributed trained
+METRIC:
+  FORCE_IN_METER: True
+  DIST_SYNC_ON_STEP: True  # # Sync Losses on step when distributed trained
+  TYPE: ['DanceDiffuse_Metric']  # DanceAE_Metric
+LOGGER:
+  SACE_CHECKPOINT_EPOCH: 100      # 保存间隔
+  LOG_EVERY_STEPS: 50
+  VAL_EVERY_STEPS: 50
+  TENSORBOARD: true
+  WANDB:
+    OFFLINE: false
+    PROJECT: null
+    RESUME_ID: null
+RENDER:
+  JOINT_TYPE: mmm
+  INPUT_MODE: npy
+  DIR: ''
+  NPY: ''
+  DENOISING: true
+  OLDRENDER: true
+  RES: high
+  DOWNSAMPLE: true
+  FPS: 12.5
+  CANONICALIZE: true
+  EXACT_FRAME: 0.5
+  NUM: 7
+  MODE: sequence
+  VID_EXT: mp4
+  ALWAYS_ON_FLOOR: false
+  GT: false
+DEMO:
+  MusicDir: /data2/lrh/dataset/fine_dance/origin/music
+  RENDER: false
+  EXAMPLE: null
+  use_cached_features: false
+
+DATA_SETTING:
+  mix: False           # 是否做混合的数据增强
+  full_seq_len: 128   # 150
+  windows: 2  # 16   #40   #
+  is_mirror: False    # 是否做镜像的数据增强
+  nfeats: 266
+  njoints: 22   
+  mode: single  # "single" , "double_react", "double"
+  partial: full   # "full" , "morden", "tradition"
+  GENRE_NUM: 16
+

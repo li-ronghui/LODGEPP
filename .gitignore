@@ -1,0 +1,34 @@
+experiments
+experiments290
+experimentsFD
+experimentsFD_smpl266
+abandon
+dance_results
+DanceDiffusion/experiments
+DanceDiffusion/experiments290
+DanceDiffusion/experimentsFD
+DanceDiffusion/experimentsFD5
+DanceDiffusion/experimentsFD139
+DanceDiffusion/experimentsAIST151
+experiments
+EDGE/experiments
+aaatemp
+NoNorm
+aaatemp
+tempoutdir
+EDGE/wandb
+experimentsAIST
+experimentsFD139
+
+# Python and local development artifacts
+__pycache__/
+*.py[cod]
+.venv/
+.vscode/
+.DS_Store
+
+# Model checkpoints and runtime outputs
+*.ckpt
+*.pth
+*.pt
+wandb/

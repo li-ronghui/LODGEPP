@@ -1,0 +1,110 @@
+gpu: 7
+window_size: 512
+full_seq_len: ${window_size}
+windows: 20
+feature_dim: 135
+tk_dir: output_vq/0722_key_135_night/FineDance_vqvae_frame_512_iter74400_tk/eval_idx
+batch_size: 2
+mask_len: 25
+fd_music_dir: dataset/data/origin/music_feature35_edge
+fd_motion_dir: dataset/data/origin/mofeature_vq_full
+fd_g_dir: /data2/lrh/dataset/fine_dance/origin/label_json/
+aistpp_dir: /opt/data/private/control2dance/debug_exp/dataset/data/aistpp/aist_plusplus_final/
+aistpp_p_dir: /opt/data/private/control2dance/debug_exp/dataset/data/mofeatrue135/mofeature_aistpp/
+aistpp_p_music_dir: /opt/data/private/control2dance/debug_exp/dataset/data/aistpp/music_feature35/
+aistpp_smpl_dir: /opt/data/private/control2dance/debug_exp/dataset/data/aistpp/smpl/
+p_h3d_dir: /opt/data/private/control2dance/debug_exp/dataset/data/mofeatrue135/mofeature_h3d/
+h3d_texts_dir: /opt/data/private/control2dance/debug_exp/dataset/data/HumanML3D/texts/
+o_h3d_dir: /opt/data/private/control2dance/debug_exp/dataset/data/HumanML3D/
+total_iter: 200000
+warm_up_iter: 1000
+lr: 0.0002
+lr_scheduler:
+- 60000
+gamma: 0.05
+weight_decay: 1.0e-06
+decay_option: all
+optimizer: adamw
+input_dim: 6
+nb_code: 512
+mu: 0.99
+down_t: 2
+stride_t: 2
+width: 12
+depth: 3
+dilation_growth_rate: 3
+output_emb_width: 12
+vq_act: relu
+vq_norm: null
+quantizer: ema_reset
+beta: 1.0
+block_size: 1024
+embed_dim_gpt: 512
+clip_dim: 512
+num_layers: 2
+n_head_gpt: 8
+ff_rate: 4
+drop_out_rate: 0.1
+resume_pth: ckpt/vqvae/f_135/0722_key_135_night/FineDance_vqvae_frame_512_iter200000/best_recon.pth
+resume_trans: gptckpt/gpt/f_135/0725/FineDance_gtp_frame_512_iter200000_tk_block1024/mask_best_acc.pth
+decoderyaml: options/config/decoder.yaml
+out_dir: experiments/infer/0829/FineDance_decoder_frame_512_iter200000_tk
+ckpt_dir: ./gptckpt/
+results_dir: visual_results/
+visual_name: baseline
+exp_name: 0829/FineDance_decoder_frame_512_iter200000_tk
+print_iter: 100
+save_iter: 1000
+eval_iter: 1000
+seed: 123
+vis_gt: false
+nb_vis: 20
+if_maxtest: false
+pkeep: 1.0
+decoder:
+  type: MotionDecoderMix4
+  loss_type: l2
+  MotionDecoderMix4:
+    nfeats: 139
+    dim:
+    - 1024
+    - 768
+    - 512
+    - 319
+    scale: 4
+nfeats: ${decoder.MotionDecoderMix4.nfeats}
+outfeats: 319
+wandb_pj_name: multidecoder
+keymotion_dir: /data2/lrh/dyq/debug_exp/output_gpt/0819/FineDance_decoder_frame_512_iter200000_tk/keymotion
+optimizer_config:
+  lr: 0.001
+  lr_scheduler:
+  - 5000
+  - 20000
+  gamma: 0.1
+  weight_decay: 1.0e-06
+  decay_option: all
+  optimizer: adamw
+resume_decoder: /data2/lrh/dyq/debug_exp/output_gpt/0820/FineDance_decoder_frame_512_iter200000_tk/decoder_ckpt/930.pth
+feature_type: baseline
+checkpoint: /data2/lrh/dyq/debug_exp/tool/experiments/0825_edge512decoder/train/edge512decoder_start_tail2/weights/train-2000.pt
+save_motions: True
+no_render: False
+do_normalize: false
+datasplit: cross_dancer
+mix: false
+# edge
+# baseyaml: configs/EDGE_KeyDiff_Hrnet/base.yaml
+# 
+# 
+# 
+# : 512
+# 
+# nfeats: 139
+# project: experiments/0821_edge512decoder/train
+# render_dir: experiments/0821_edge512decoder/renders
+# save_interval: 10
+# scale: 8
+# wandb_pj_name: 0821_edge512decoder
+# windows: 20
+
